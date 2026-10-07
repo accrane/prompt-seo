@@ -48,7 +48,7 @@ export default async function OverviewPage({
 
   const states = promptStates(project, runs, data);
   const recs = recommendations(project, states, pages, tasks);
-  const openTasks = tasks.filter((t) => !t.done_at && t.category !== "technical");
+  const openTasks = tasks.filter((t) => !t.done_at && (t.category ?? "checklist") === "checklist");
   const built = pages.filter((p) => p.status === "drafted" || p.status === "published").length;
   const month = currentBuildMonth(
     states.find((s) => s.prompt === "p2")?.approved?.approved_at ?? null,

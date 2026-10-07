@@ -84,10 +84,12 @@ function PlanPage({ page }: { page: ClientPage }) {
 function ChecklistItem({
   task,
   token,
+  tab,
   justSaved,
 }: {
   task: ClientTask;
   token: string;
+  tab: string;
   justSaved: boolean;
 }) {
   const done = Boolean(task.done_at);
@@ -128,6 +130,7 @@ function ChecklistItem({
         </p>
         {task.asks_answer && !done ? (
           <form action={saveClientAnswer.bind(null, token, task.id)} className="mt-3">
+            <input name="tab" type="hidden" value={tab} />
             <label
               className="block text-sm font-medium text-slate-950"
               htmlFor={`answer-${task.id}`}
@@ -172,10 +175,13 @@ function ChecklistItem({
 function Checklist({
   tasks,
   token,
+  tab,
   saved,
 }: {
   tasks: ClientTask[];
   token: string;
+  /** The tab these items are on, so a saved answer returns to it. */
+  tab: string;
   saved: string | null;
 }) {
   const open = tasks.filter((t) => !t.done_at);
@@ -200,6 +206,7 @@ function Checklist({
                 <ChecklistItem
                   justSaved={saved === task.id}
                   key={task.id}
+                  tab={tab}
                   task={task}
                   token={token}
                 />
@@ -333,11 +340,22 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
           },
         ]
       : []),
+    ...(plan.gbp.length
+      ? [
+          {
+            key: "gbp",
+            label: "Google Business Profile",
+            count: plan.gbp.length,
+            href: `/plan/${token}?tab=gbp`,
+          },
+        ]
+      : []),
   ];
   const { tab: wanted, saved } = await searchParams;
   const tab = tabs.find((t) => t.key === wanted)?.key ?? "pages";
   const tasksDone = plan.tasks.filter((t) => t.done_at).length;
   const technicalFixed = plan.technical.filter((t) => t.done_at).length;
+  const gbpDone = plan.gbp.filter((t) => t.done_at).length;
 
   // The client sees only the ticked pages, so re-flow them into months at the
   // plan's pace. Otherwise a month with a hidden page would look half empty.
@@ -391,6 +409,12 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
             with the pages each one affects. {technicalFixed} of {plan.technical.length} fixed so
             far.
           </p>
+        ) : tab === "gbp" ? (
+          <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
+            Recommendations for your Google Business Profile, the listing people see in Google Maps
+            and local search results. These are yours to complete. {gbpDone} of {plan.gbp.length}{" "}
+            done so far.
+          </p>
         ) : (
           <>
             <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
@@ -414,7 +438,15 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
       {tab === "checklist" ? (
         <Checklist
           saved={typeof saved === "string" ? saved : null}
+          tab="checklist"
           tasks={plan.tasks}
+          token={token}
+        />
+      ) : tab === "gbp" ? (
+        <Checklist
+          saved={typeof saved === "string" ? saved : null}
+          tab="gbp"
+          tasks={plan.gbp}
           token={token}
         />
       ) : tab === "technical" ? (

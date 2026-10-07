@@ -40,5 +40,7 @@ export async function saveClientAnswer(
       .select("id"),
     "Save answer",
   );
-  redirect(`/plan/${token}?tab=checklist&saved=${taskId}#item-${taskId}`);
+  // Land back on the tab the item lives on.
+  const tab = String(formData.get("tab")) === "gbp" ? "gbp" : "checklist";
+  redirect(`/plan/${token}?tab=${tab}&saved=${taskId}#item-${taskId}`);
 }

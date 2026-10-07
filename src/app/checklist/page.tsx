@@ -10,9 +10,12 @@ export const metadata: Metadata = { title: "Checklist" };
 
 export default async function ChecklistPage() {
   const operator = await requireOperator();
-  // Technical audit findings stay on their project's checklist; one per URL
-  // would drown this list.
-  const open = (await listTasks()).filter((t) => !t.done_at && t.category !== "technical");
+  // Audit findings and Google Business Profile items stay on their project's
+  // checklist; they would drown this list. Rows from before the category
+  // column existed count as checklist items.
+  const open = (await listTasks()).filter(
+    (t) => !t.done_at && (t.category ?? "checklist") === "checklist",
+  );
 
   return (
     <AppShell

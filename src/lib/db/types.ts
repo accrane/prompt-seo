@@ -110,8 +110,11 @@ export type Task = {
   done_at: string | null;
   sort: number;
   client_visible: boolean;
-  /** "technical" items are audit findings: one per affected URL. */
-  category: "checklist" | "technical";
+  /**
+   * "technical" items are audit findings, one per affected URL; "gbp" items
+   * are Google Business Profile recommendations. Each has its own client tab.
+   */
+  category: "checklist" | "technical" | "gbp";
   url: string | null;
   note: string | null;
   /** Show an answer box for this item on the client plan page. */

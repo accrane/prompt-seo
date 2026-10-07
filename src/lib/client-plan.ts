@@ -57,6 +57,8 @@ export type ClientPlan = {
   tasks: ClientTask[];
   /** Audit findings, one per affected URL. */
   technical: ClientTask[];
+  /** Google Business Profile recommendations. */
+  gbp: ClientTask[];
 };
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{20,64}$/;
@@ -120,7 +122,8 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
     pagesPerMonth: Number.isInteger(capacity) && capacity > 0 ? capacity : 2,
     websiteUrl: project.data.website_url,
     pages: (pages.data ?? []) as ClientPage[],
-    tasks: clientTasks.filter((t) => t.category !== "technical"),
+    tasks: clientTasks.filter((t) => t.category === "checklist"),
     technical: clientTasks.filter((t) => t.category === "technical"),
+    gbp: clientTasks.filter((t) => t.category === "gbp"),
   };
 }

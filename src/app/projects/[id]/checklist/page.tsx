@@ -19,7 +19,8 @@ export default async function ProjectChecklistPage({
   const operator = await requireOperator();
   const { id } = await params;
   const [project, all] = await Promise.all([getProject(id), listTasks(id)]);
-  const tasks = all.filter((t) => t.category !== "technical");
+  const tasks = all.filter((t) => (t.category ?? "checklist") === "checklist");
+  const gbp = all.filter((t) => t.category === "gbp");
   const open = tasks.filter((t) => !t.done_at);
   const done = tasks.filter((t) => t.done_at);
   const clientShown = tasks.filter((t) => t.client_visible).length;
@@ -89,6 +90,23 @@ export default async function ProjectChecklistPage({
           ) : null}
         </>
       )}
+
+      {gbp.length ? (
+        <details className="rounded-lg border border-slate-200 bg-white" open>
+          <summary className="px-5 py-3">
+            <span className="text-sm font-semibold text-slate-950">
+              Google Business Profile · {gbp.filter((t) => !t.done_at).length} of {gbp.length} open
+            </span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              {gbp.filter((t) => t.client_visible).length} shown on the client plan page&apos;s
+              Google Business Profile tab.
+            </span>
+          </summary>
+          <div className="border-t border-slate-200">
+            <TaskList clientToggle tasks={gbp} />
+          </div>
+        </details>
+      ) : null}
 
       {[...technical].map(([issue, items]) => (
         <details className="rounded-lg border border-slate-200 bg-white" key={issue}>
