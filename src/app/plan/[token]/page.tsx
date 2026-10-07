@@ -38,6 +38,19 @@ const PROGRESS: Record<PageStatus, Progress> = {
   skipped: PLANNED,
 };
 
+/** The plan's internal page types ("Product or service page (money)") in plain words. */
+function clientPageType(pageType: string): string {
+  const type = pageType.toLowerCase();
+  if (type.includes("pricing")) return "Pricing page";
+  if (type.includes("product or service")) return "Service page";
+  if (type.includes("pillar")) return "Guide";
+  if (type.includes("cluster article")) return "Article";
+  if (type.includes("comparison")) return "Comparison page";
+  if (type.includes("faq")) return "FAQ page";
+  if (type.includes("tool")) return "Tool page";
+  return pageType.replace(/\s*\(.*\)\s*$/, "");
+}
+
 function PlanPage({ page }: { page: ClientPage }) {
   const progress = PROGRESS[page.status];
   return (
@@ -60,7 +73,7 @@ function PlanPage({ page }: { page: ClientPage }) {
       ) : null}
       <p className="mt-1.5 text-sm text-slate-500">
         {ACTION_LABEL[page.action]}
-        {page.page_type ? ` · ${page.page_type}` : null}
+        {page.page_type ? ` · ${clientPageType(page.page_type)}` : null}
       </p>
     </li>
   );
@@ -148,11 +161,12 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
   const tab = hasChecklist && (await searchParams).tab === "checklist" ? "checklist" : "pages";
   const tasksDone = plan.tasks.filter((t) => t.done_at).length;
 
-  const byMonth = new Map<number | null, ClientPage[]>();
-  for (const page of plan.pages) {
-    byMonth.set(page.build_month, [...(byMonth.get(page.build_month) ?? []), page]);
+  // The client sees only the ticked pages, so re-flow them into months at the
+  // plan's pace. Otherwise a month with a hidden page would look half empty.
+  const months: ClientPage[][] = [];
+  for (let i = 0; i < plan.pages.length; i += plan.pagesPerMonth) {
+    months.push(plan.pages.slice(i, i + plan.pagesPerMonth));
   }
-  const months = [...byMonth.keys()].sort((a, b) => (a ?? 99) - (b ?? 99));
   const live = plan.pages.filter((p) => p.status === "published").length;
   const site = plan.websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
@@ -224,13 +238,13 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
           The recommendations are being finalized. Check back soon.
         </p>
       ) : (
-        months.map((m) => (
-          <section className="mt-12" key={m ?? "later"}>
+        months.map((pages, index) => (
+          <section className="mt-12" key={index}>
             <div className="border-b-2 border-slate-950 pb-2">
-              <h2 className="text-xl font-semibold text-slate-950">{m ? `Month ${m}` : "Later"}</h2>
+              <h2 className="text-xl font-semibold text-slate-950">Month {index + 1}</h2>
             </div>
             <ul className="divide-y divide-slate-200">
-              {byMonth.get(m)!.map((page) => (
+              {pages.map((page) => (
                 <PlanPage key={page.id} page={page} />
               ))}
             </ul>

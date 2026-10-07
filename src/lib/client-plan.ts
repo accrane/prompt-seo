@@ -20,6 +20,8 @@ export type ClientTask = Pick<Task, "id" | "title" | "detail" | "due_on" | "done
 export type ClientPlan = {
   projectName: string;
   websiteUrl: string;
+  /** How many pages the plan schedules per month (the intake's content capacity). */
+  pagesPerMonth: number;
   pages: ClientPage[];
   tasks: ClientTask[];
 };
@@ -37,7 +39,7 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
 
   const project = await db()
     .from("pseo_projects")
-    .select("id, name, website_url")
+    .select("id, name, website_url, profile")
     .eq("share_token", token)
     .maybeSingle();
   if (project.error) throw new Error(`Load plan: ${project.error.message}`);
@@ -51,7 +53,8 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
       .eq("client_visible", true)
       .neq("status", "skipped")
       .order("build_month", { ascending: true, nullsFirst: false })
-      .order("created_at"),
+      .order("created_at")
+      .order("url"),
     db()
       .from("pseo_tasks")
       .select(CLIENT_TASK_COLUMNS)
@@ -64,8 +67,11 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
   if (pages.error) throw new Error(`Load plan pages: ${pages.error.message}`);
   if (tasks.error) throw new Error(`Load plan checklist: ${tasks.error.message}`);
 
+  const capacity = Number((project.data.profile as Record<string, string>)?.content_capacity);
+
   return {
     projectName: project.data.name,
+    pagesPerMonth: Number.isInteger(capacity) && capacity > 0 ? capacity : 2,
     websiteUrl: project.data.website_url,
     pages: (pages.data ?? []) as ClientPage[],
     tasks: (tasks.data ?? []) as ClientTask[],
