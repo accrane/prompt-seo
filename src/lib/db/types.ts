@@ -110,6 +110,10 @@ export type Task = {
   done_at: string | null;
   sort: number;
   client_visible: boolean;
+  /** "technical" items are audit findings: one per affected URL. */
+  category: "checklist" | "technical";
+  url: string | null;
+  note: string | null;
 };
 
 export type ExtractedTask = {

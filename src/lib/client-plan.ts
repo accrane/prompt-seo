@@ -12,10 +12,27 @@ export type ClientPage = Pick<
   "id" | "url" | "page_type" | "canonical_query" | "job" | "build_month" | "action" | "status"
 >;
 
-/** The checklist fields a client may see. */
-const CLIENT_TASK_COLUMNS = "id, title, detail, due_on, done_at" as const;
+/**
+ * The checklist fields a client may see. Rows are read whole so the page still
+ * loads on a database without migration 005's columns, then cut down to these.
+ */
+function toClientTask(row: Task): ClientTask {
+  return {
+    id: row.id,
+    title: row.title,
+    detail: row.detail,
+    due_on: row.due_on,
+    done_at: row.done_at,
+    category: row.category ?? "checklist",
+    url: row.url ?? null,
+    note: row.note ?? null,
+  };
+}
 
-export type ClientTask = Pick<Task, "id" | "title" | "detail" | "due_on" | "done_at">;
+export type ClientTask = Pick<
+  Task,
+  "id" | "title" | "detail" | "due_on" | "done_at" | "category" | "url" | "note"
+>;
 
 export type ClientPlan = {
   projectName: string;
@@ -24,6 +41,8 @@ export type ClientPlan = {
   pagesPerMonth: number;
   pages: ClientPage[];
   tasks: ClientTask[];
+  /** Audit findings, one per affected URL. */
+  technical: ClientTask[];
 };
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{20,64}$/;
@@ -57,7 +76,7 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
       .order("url"),
     db()
       .from("pseo_tasks")
-      .select(CLIENT_TASK_COLUMNS)
+      .select("*")
       .eq("project_id", project.data.id)
       .eq("client_visible", true)
       .order("done_at", { ascending: true, nullsFirst: true })
@@ -67,6 +86,7 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
   if (pages.error) throw new Error(`Load plan pages: ${pages.error.message}`);
   if (tasks.error) throw new Error(`Load plan checklist: ${tasks.error.message}`);
 
+  const clientTasks = ((tasks.data ?? []) as Task[]).map(toClientTask);
   const capacity = Number((project.data.profile as Record<string, string>)?.content_capacity);
 
   return {
@@ -74,6 +94,7 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
     pagesPerMonth: Number.isInteger(capacity) && capacity > 0 ? capacity : 2,
     websiteUrl: project.data.website_url,
     pages: (pages.data ?? []) as ClientPage[],
-    tasks: (tasks.data ?? []) as ClientTask[],
+    tasks: clientTasks.filter((t) => t.category !== "technical"),
+    technical: clientTasks.filter((t) => t.category === "technical"),
   };
 }

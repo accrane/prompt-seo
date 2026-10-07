@@ -18,10 +18,17 @@ export default async function ProjectChecklistPage({
 }: PageProps<"/projects/[id]/checklist">) {
   const operator = await requireOperator();
   const { id } = await params;
-  const [project, tasks] = await Promise.all([getProject(id), listTasks(id)]);
+  const [project, all] = await Promise.all([getProject(id), listTasks(id)]);
+  const tasks = all.filter((t) => t.category !== "technical");
   const open = tasks.filter((t) => !t.done_at);
   const done = tasks.filter((t) => t.done_at);
   const clientShown = tasks.filter((t) => t.client_visible).length;
+
+  // Technical audit findings: one row per affected URL, grouped by issue.
+  const technical = new Map<string, typeof all>();
+  for (const t of all.filter((t) => t.category === "technical")) {
+    technical.set(t.title, [...(technical.get(t.title) ?? []), t]);
+  }
 
   return (
     <AppShell
@@ -82,6 +89,24 @@ export default async function ProjectChecklistPage({
           ) : null}
         </>
       )}
+
+      {[...technical].map(([issue, items]) => (
+        <details className="rounded-lg border border-slate-200 bg-white" key={issue}>
+          <summary className="px-5 py-3">
+            <span className="text-sm font-semibold text-slate-950">
+              Technical issue: {issue} · {items.filter((t) => !t.done_at).length} of {items.length}{" "}
+              open
+            </span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              {items.filter((t) => t.client_visible).length} shown on the client plan page&apos;s
+              Technical Issues tab. {items[0].detail}
+            </span>
+          </summary>
+          <div className="border-t border-slate-200">
+            <TaskList clientToggle tasks={items} />
+          </div>
+        </details>
+      ))}
     </AppShell>
   );
 }

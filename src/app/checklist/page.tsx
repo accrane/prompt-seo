@@ -10,7 +10,9 @@ export const metadata: Metadata = { title: "Checklist" };
 
 export default async function ChecklistPage() {
   const operator = await requireOperator();
-  const open = (await listTasks()).filter((t) => !t.done_at);
+  // Technical audit findings stay on their project's checklist; one per URL
+  // would drown this list.
+  const open = (await listTasks()).filter((t) => !t.done_at && t.category !== "technical");
 
   return (
     <AppShell

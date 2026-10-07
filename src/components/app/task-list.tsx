@@ -32,6 +32,8 @@ export function TaskList({
       {tasks.map((task) => {
         const done = Boolean(task.done_at);
         const overdue = !done && task.due_on && task.due_on < today;
+        // Technical findings are listed under their issue, so the row is the page.
+        const technical = task.category === "technical";
         return (
           <li className="flex items-start gap-3 px-5 py-3" key={task.id}>
             <form action={toggleTask.bind(null, task.id, !done)}>
@@ -62,9 +64,13 @@ export function TaskList({
               <p
                 className={`text-sm font-medium ${done ? "text-slate-400 line-through" : "text-slate-950"}`}
               >
-                {task.title}
+                {technical ? (task.url ?? task.title) : task.title}
               </p>
-              {task.detail && !done ? (
+              {technical ? (
+                task.note ? (
+                  <p className="mt-0.5 text-sm text-slate-500">{task.note}</p>
+                ) : null
+              ) : task.detail && !done ? (
                 <p className="mt-0.5 text-sm text-slate-500">{task.detail}</p>
               ) : null}
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -76,7 +82,7 @@ export function TaskList({
                     {task.project_name}
                   </Link>
                 ) : null}
-                {task.owner ? (
+                {task.owner && !technical ? (
                   <span className="type-label">{OWNER_LABEL[task.owner] ?? task.owner}</span>
                 ) : null}
                 {task.due_on ? (

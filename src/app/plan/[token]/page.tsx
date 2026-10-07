@@ -151,15 +151,123 @@ function Checklist({ tasks }: { tasks: ClientTask[] }) {
   );
 }
 
+/** A small read-only tick box: filled when the item is done. */
+function Tick({ done }: { done: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+        done ? "border-emerald-700 bg-emerald-700 text-white" : "border-slate-400 bg-white"
+      }`}
+    >
+      {done ? (
+        <svg
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+          viewBox="0 0 24 24"
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      ) : null}
+    </span>
+  );
+}
+
+/** Audit findings grouped by issue: the fix once, then every affected page. */
+function TechnicalIssues({ issues, origin }: { issues: ClientTask[]; origin: string }) {
+  const groups = new Map<string, ClientTask[]>();
+  for (const issue of issues) groups.set(issue.title, [...(groups.get(issue.title) ?? []), issue]);
+  return (
+    <>
+      {[...groups].map(([title, items]) => {
+        const fixed = items.filter((i) => i.done_at).length;
+        return (
+          <section className="mt-12" key={title}>
+            <div className="flex items-baseline justify-between gap-4 border-b-2 border-slate-950 pb-2">
+              <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+              <span className="shrink-0 text-sm text-slate-500">
+                {fixed} of {items.length} fixed
+              </span>
+            </div>
+            {items[0].detail ? (
+              <p className="mt-4 text-[17px] leading-relaxed text-slate-700">
+                <span className="font-semibold text-slate-950">How to fix: </span>
+                {items[0].detail}
+              </p>
+            ) : null}
+            <ul className="mt-2 divide-y divide-slate-200">
+              {items.map((item) => {
+                const done = Boolean(item.done_at);
+                const path = (item.url ?? "").replace(origin, "") || "/";
+                return (
+                  <li className="flex items-start gap-3 py-3" key={item.id}>
+                    <Tick done={done} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[17px] break-all text-slate-950">
+                        <span className="sr-only">{done ? "Fixed: " : "To fix: "}</span>
+                        {item.url ? (
+                          <a
+                            className="underline decoration-slate-300 underline-offset-2 hover:decoration-slate-950"
+                            href={item.url}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {path}
+                          </a>
+                        ) : (
+                          path
+                        )}
+                      </p>
+                      {item.note ? (
+                        <p className="mt-0.5 text-sm text-slate-500">{item.note}</p>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
 export default async function ClientPlanPage({ params, searchParams }: PageProps<"/plan/[token]">) {
   const { token } = await params;
   const plan = await getClientPlan(token);
   if (!plan) notFound();
 
-  // The Checklist tab only exists when there is something on it.
-  const hasChecklist = plan.tasks.length > 0;
-  const tab = hasChecklist && (await searchParams).tab === "checklist" ? "checklist" : "pages";
+  // A tab only exists when there is something on it.
+  const tabs = [
+    { key: "pages", label: "Pages", count: plan.pages.length, href: `/plan/${token}` },
+    ...(plan.tasks.length
+      ? [
+          {
+            key: "checklist",
+            label: "Checklist",
+            count: plan.tasks.length,
+            href: `/plan/${token}?tab=checklist`,
+          },
+        ]
+      : []),
+    ...(plan.technical.length
+      ? [
+          {
+            key: "technical",
+            label: "Technical Issues",
+            count: plan.technical.length,
+            href: `/plan/${token}?tab=technical`,
+          },
+        ]
+      : []),
+  ];
+  const wanted = (await searchParams).tab;
+  const tab = tabs.find((t) => t.key === wanted)?.key ?? "pages";
   const tasksDone = plan.tasks.filter((t) => t.done_at).length;
+  const technicalFixed = plan.technical.filter((t) => t.done_at).length;
 
   // The client sees only the ticked pages, so re-flow them into months at the
   // plan's pace. Otherwise a month with a hidden page would look half empty.
@@ -177,22 +285,15 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
         <h1 className="mt-2 text-3xl leading-tight font-semibold tracking-tight text-slate-950 sm:text-4xl">
           {plan.projectName}: recommended website content plan
         </h1>
-        {hasChecklist ? (
-          <nav aria-label="Plan sections" className="mt-8 flex gap-6 border-b border-slate-200">
-            {(
-              [
-                { key: "pages", label: "Pages", count: plan.pages.length, href: `/plan/${token}` },
-                {
-                  key: "checklist",
-                  label: "Checklist",
-                  count: plan.tasks.length,
-                  href: `/plan/${token}?tab=checklist`,
-                },
-              ] as const
-            ).map((item) => (
+        {tabs.length > 1 ? (
+          <nav
+            aria-label="Plan sections"
+            className="mt-8 flex gap-6 overflow-x-auto border-b border-slate-200"
+          >
+            {tabs.map((item) => (
               <Link
                 aria-current={tab === item.key ? "page" : undefined}
-                className={`-mb-px border-b-2 px-1 py-3 text-[17px] font-medium ${
+                className={`-mb-px border-b-2 px-1 py-3 text-[17px] font-medium whitespace-nowrap ${
                   tab === item.key
                     ? "border-slate-950 text-slate-950"
                     : "border-transparent text-slate-500 hover:text-slate-950"
@@ -209,6 +310,12 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
           <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
             The other steps we recommend alongside the pages. These are yours to complete.{" "}
             {tasksDone} of {plan.tasks.length} done so far.
+          </p>
+        ) : tab === "technical" ? (
+          <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
+            Problems a technical audit found on your website that need to be fixed, grouped by issue
+            with the pages each one affects. {technicalFixed} of {plan.technical.length} fixed so
+            far.
           </p>
         ) : (
           <>
@@ -232,6 +339,8 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
 
       {tab === "checklist" ? (
         <Checklist tasks={plan.tasks} />
+      ) : tab === "technical" ? (
+        <TechnicalIssues issues={plan.technical} origin={plan.websiteUrl.replace(/\/$/, "")} />
       ) : plan.pages.length === 0 ? (
         <p className="mt-10 rounded-lg border border-slate-200 bg-white px-5 py-6 text-[17px] text-slate-700">
           The recommendations are being finalized. Check back soon.
