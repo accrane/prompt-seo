@@ -9,7 +9,7 @@ import { formatDate } from "@/lib/format";
 // A private link: keep it out of search results and never cache one
 // client's plan for another request.
 export const metadata: Metadata = {
-  title: { absolute: "Website content plan" },
+  title: { absolute: "Recommended website content plan" },
   robots: { index: false, follow: false },
 };
 export const dynamic = "force-dynamic";
@@ -23,7 +23,9 @@ const ACTION_LABEL: Record<PageAction, string> = {
 
 type Progress = { label: string; className: string };
 
-const PLANNED: Progress = { label: "Planned", className: "bg-slate-100 text-slate-700" };
+// The plan is a recommendation the client carries out, so nothing is
+// "planned" on our side until they start it.
+const PLANNED: Progress = { label: "Recommended", className: "bg-slate-100 text-slate-700" };
 const IN_PROGRESS: Progress = { label: "In progress", className: "bg-amber-100 text-amber-900" };
 const LIVE: Progress = { label: "Live", className: "bg-emerald-100 text-emerald-900" };
 
@@ -35,14 +37,6 @@ const PROGRESS: Record<PageStatus, Progress> = {
   published: LIVE,
   skipped: PLANNED,
 };
-
-/** "October 2026" for build month N, counting 30-day months from the plan's start. */
-function monthLabel(planStartedAt: string | null, month: number): string | null {
-  if (!planStartedAt) return null;
-  const start = new Date(planStartedAt);
-  start.setDate(start.getDate() + (month - 1) * 30);
-  return start.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
 
 function PlanPage({ page }: { page: ClientPage }) {
   const progress = PROGRESS[page.status];
@@ -107,8 +101,8 @@ function ChecklistItem({ task }: { task: ClientTask }) {
           {done
             ? `Done ${formatDate(task.done_at)}`
             : task.due_on
-              ? `Due ${formatDate(task.due_on)}`
-              : "Not scheduled yet"}
+              ? `Suggested by ${formatDate(task.due_on)}`
+              : "No date suggested"}
         </p>
       </div>
     </li>
@@ -167,7 +161,7 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
       <header>
         <p className="text-sm font-medium text-slate-500">{site}</p>
         <h1 className="mt-2 text-3xl leading-tight font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          {plan.projectName}: website content plan
+          {plan.projectName}: recommended website content plan
         </h1>
         {hasChecklist ? (
           <nav aria-label="Plan sections" className="mt-8 flex gap-6 border-b border-slate-200">
@@ -199,19 +193,23 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
         ) : null}
         {tab === "checklist" ? (
           <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
-            The work behind the plan, beyond writing pages. {tasksDone} of {plan.tasks.length} done
-            so far.
+            The other steps we recommend alongside the pages. These are yours to complete.{" "}
+            {tasksDone} of {plan.tasks.length} done so far.
           </p>
         ) : (
           <>
             <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
-              These are the pages we&apos;re building or rewriting for your site, in the order
-              we&apos;ll work on them. Each one is written to answer a specific search your
-              customers make.
+              This is the content plan we recommend for your website: the pages to add or rewrite,
+              month by month, in the order we&apos;d tackle them. Each page answers a specific
+              search your customers make.
+            </p>
+            <p className="mt-3 text-[17px] leading-relaxed text-slate-700">
+              It&apos;s a recommendation, not work underway. Building these pages is yours to carry
+              out, and the months are a suggested pace that starts whenever you do.
             </p>
             {plan.pages.length ? (
               <p className="mt-3 text-[17px] leading-relaxed text-slate-700">
-                {plan.pages.length} page{plan.pages.length === 1 ? "" : "s"} planned
+                {plan.pages.length} page{plan.pages.length === 1 ? "" : "s"} recommended
                 {live ? `, ${live} live so far` : ""}.
               </p>
             ) : null}
@@ -223,33 +221,27 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
         <Checklist tasks={plan.tasks} />
       ) : plan.pages.length === 0 ? (
         <p className="mt-10 rounded-lg border border-slate-200 bg-white px-5 py-6 text-[17px] text-slate-700">
-          The plan is being finalized. Check back soon.
+          The recommendations are being finalized. Check back soon.
         </p>
       ) : (
-        months.map((m) => {
-          const label = m ? monthLabel(plan.planStartedAt, m) : null;
-          return (
-            <section className="mt-12" key={m ?? "later"}>
-              <div className="flex items-baseline justify-between gap-4 border-b-2 border-slate-950 pb-2">
-                <h2 className="text-xl font-semibold text-slate-950">
-                  {m ? `Month ${m}` : "Later"}
-                </h2>
-                {label ? <span className="text-sm text-slate-500">{label}</span> : null}
-              </div>
-              <ul className="divide-y divide-slate-200">
-                {byMonth.get(m)!.map((page) => (
-                  <PlanPage key={page.id} page={page} />
-                ))}
-              </ul>
-            </section>
-          );
-        })
+        months.map((m) => (
+          <section className="mt-12" key={m ?? "later"}>
+            <div className="border-b-2 border-slate-950 pb-2">
+              <h2 className="text-xl font-semibold text-slate-950">{m ? `Month ${m}` : "Later"}</h2>
+            </div>
+            <ul className="divide-y divide-slate-200">
+              {byMonth.get(m)!.map((page) => (
+                <PlanPage key={page.id} page={page} />
+              ))}
+            </ul>
+          </section>
+        ))
       )}
 
       <footer className="mt-16 border-t border-slate-200 pt-6 text-sm leading-relaxed text-slate-500">
         <p>
-          Questions or changes? Reply to the email this link came in. Prepared by Bellaworks Web
-          Design.
+          Want a hand with any of this? Reply to the email this link came in. Prepared by Bellaworks
+          Web Design.
         </p>
       </footer>
     </main>

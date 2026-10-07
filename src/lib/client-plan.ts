@@ -2,7 +2,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import type { Page, Task } from "@/lib/db/types";
-import { latestApprovedRun } from "@/lib/projects";
 
 /** The page fields a client may see. Nothing else is selected for /plan. */
 const CLIENT_PAGE_COLUMNS =
@@ -21,8 +20,6 @@ export type ClientTask = Pick<Task, "id" | "title" | "detail" | "due_on" | "done
 export type ClientPlan = {
   projectName: string;
   websiteUrl: string;
-  /** When the plan was approved; month 1 starts here. */
-  planStartedAt: string | null;
   pages: ClientPage[];
   tasks: ClientTask[];
 };
@@ -46,7 +43,7 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
   if (project.error) throw new Error(`Load plan: ${project.error.message}`);
   if (!project.data) return null;
 
-  const [pages, tasks, plan] = await Promise.all([
+  const [pages, tasks] = await Promise.all([
     db()
       .from("pseo_pages")
       .select(CLIENT_PAGE_COLUMNS)
@@ -63,7 +60,6 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
       .order("done_at", { ascending: true, nullsFirst: true })
       .order("due_on", { ascending: true, nullsFirst: false })
       .order("sort"),
-    latestApprovedRun(project.data.id, "p2"),
   ]);
   if (pages.error) throw new Error(`Load plan pages: ${pages.error.message}`);
   if (tasks.error) throw new Error(`Load plan checklist: ${tasks.error.message}`);
@@ -71,7 +67,6 @@ export async function getClientPlan(token: string): Promise<ClientPlan | null> {
   return {
     projectName: project.data.name,
     websiteUrl: project.data.website_url,
-    planStartedAt: plan?.approved_at ?? null,
     pages: (pages.data ?? []) as ClientPage[],
     tasks: (tasks.data ?? []) as ClientTask[],
   };
