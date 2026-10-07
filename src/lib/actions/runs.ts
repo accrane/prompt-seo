@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { withError, withFlash } from "@/components/app/flash";
 import { requireOperator } from "@/lib/auth";
 import { DEFAULT_EFFORT, EFFORT_LEVELS, RUN_MODEL } from "@/lib/claude";
+import { runBlocker } from "@/lib/config-check";
 import { db, must } from "@/lib/db";
 import type { Page } from "@/lib/db/types";
 import { getProject, getRun, listPages, monthSpend } from "@/lib/projects";
@@ -27,6 +28,8 @@ export async function startRun(projectId: string, formData: FormData): Promise<v
 
   const pageId = String(formData.get("page_id") ?? "") || undefined;
   const back = `/projects/${projectId}/runs/new?prompt=${prompt}${pageId ? `&page=${pageId}` : ""}`;
+  const blocker = runBlocker();
+  if (blocker) redirect(withError(back, blocker));
   const effortValue = String(formData.get("effort") ?? DEFAULT_EFFORT);
   const effort = (EFFORT_LEVELS as readonly string[]).includes(effortValue)
     ? effortValue
@@ -103,6 +106,8 @@ export async function startRun(projectId: string, formData: FormData): Promise<v
 export async function resumeRun(runId: string): Promise<void> {
   await requireOperator();
   const run = await getRun(runId);
+  const blocker = runBlocker();
+  if (blocker) redirect(withError(runPath(run.project_id, runId), blocker));
   must(
     await db()
       .from("pseo_runs")

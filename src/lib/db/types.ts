@@ -13,6 +13,7 @@ export type Project = {
   google_connection_id: string | null;
   gsc_property: string | null;
   gsc_pulled_at: string | null;
+  share_token: string | null;
 };
 
 export type DataSource = {
@@ -93,6 +94,7 @@ export type Page = {
   action: PageAction;
   status: PageStatus;
   draft_run_id: string | null;
+  client_visible: boolean;
 };
 
 export type Task = {
@@ -107,6 +109,7 @@ export type Task = {
   due_on: string | null;
   done_at: string | null;
   sort: number;
+  client_visible: boolean;
 };
 
 export type ExtractedTask = {

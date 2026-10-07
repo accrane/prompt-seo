@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { StatusBadge } from "@/components/ui/status-badge";
+import { setTaskClientVisible } from "@/lib/actions/client-plan";
 import { deleteTask, toggleTask } from "@/lib/actions/tasks";
 import type { Task } from "@/lib/db/types";
 import { formatDate } from "@/lib/format";
@@ -12,13 +13,18 @@ const OWNER_LABEL: Record<string, string> = {
   operator: "You",
 };
 
-/** Checklist rows: a checkbox that toggles done, due date, owner, source run. */
+/**
+ * Checklist rows: a checkbox that toggles done, due date, owner, source run.
+ * `clientToggle` adds the "Client sees this" tick for the client plan page.
+ */
 export function TaskList({
   tasks,
   showProject = false,
+  clientToggle = false,
 }: {
   tasks: (Task & { project_name?: string })[];
   showProject?: boolean;
+  clientToggle?: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   return (
@@ -90,6 +96,25 @@ export function TaskList({
                 ) : null}
               </p>
             </div>
+            {clientToggle ? (
+              <form action={setTaskClientVisible.bind(null, task.id, !task.client_visible)}>
+                <button
+                  aria-pressed={task.client_visible}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[13px] font-medium whitespace-nowrap ${
+                    task.client_visible
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 text-slate-500 hover:bg-slate-100"
+                  }`}
+                  title={
+                    task.client_visible ? "Hide from the client plan" : "Show on the client plan"
+                  }
+                  type="submit"
+                >
+                  <span aria-hidden>{task.client_visible ? "☑" : "☐"}</span>
+                  Client sees this
+                </button>
+              </form>
+            ) : null}
             <form action={deleteTask.bind(null, task.id)}>
               <button
                 aria-label="Delete item"

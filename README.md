@@ -25,7 +25,17 @@ maps every bracket to a variable; `pnpm check:prompts` fails if one is unmapped.
    WP Manager's migrations must already be in place).
 4. `pnpm dev` → http://localhost:3001. Sign in with the WP Manager login.
 
-On Vercel (Pro): set the same env vars, including `NEXT_PUBLIC_APP_URL`.
+On Vercel (Pro): set the same env vars, including `NEXT_PUBLIC_APP_URL`. A
+deployment without `ANTHROPIC_API_KEY` still serves the admin and client plan
+pages; it just can't start or resume a run.
+
+## Client plan page
+
+Pages → **Create client link** gives a read-only page at `/plan/<token>` with
+no login. It shows only the pages and checklist items ticked "Client sees
+this" (creating the link ticks build months 1 and 2 to start). **Turn off
+link** kills the URL. If you work on localhost but clients open the live site,
+set `CLIENT_PLAN_ORIGIN` locally to the live URL so the link points there.
 
 ## How a run works
 

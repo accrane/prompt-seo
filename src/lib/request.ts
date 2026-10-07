@@ -12,3 +12,11 @@ export async function appOrigin(): Promise<string> {
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   return `${proto}://${host}`;
 }
+
+/**
+ * Origin for client plan links. Set CLIENT_PLAN_ORIGIN when the admin work
+ * happens on one copy (e.g. localhost) but clients open the live site.
+ */
+export async function clientPlanOrigin(): Promise<string> {
+  return env.CLIENT_PLAN_ORIGIN ?? (await appOrigin());
+}

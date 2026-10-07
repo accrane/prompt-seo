@@ -2,17 +2,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app/app-shell";
+import { CopyButton } from "@/components/app/copy-button";
 import { Flash } from "@/components/app/flash";
 import { ProjectNav } from "@/components/app/project-nav";
-import { ButtonLink } from "@/components/ui/button";
+import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { selectClasses } from "@/components/ui/form";
 import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
+import {
+  createClientLink,
+  revokeClientLink,
+  setMonthClientVisible,
+  setPageClientVisible,
+} from "@/lib/actions/client-plan";
 import { setPageStatus } from "@/lib/actions/tasks";
 import { requireOperator } from "@/lib/auth";
 import type { Page, PageStatus } from "@/lib/db/types";
 import { getProject, latestApprovedRun, listPages } from "@/lib/projects";
 import { currentBuildMonth } from "@/lib/recommendations";
+import { clientPlanOrigin } from "@/lib/request";
 
 export const metadata: Metadata = { title: "Pages" };
 
@@ -55,6 +63,21 @@ function PageRow({
         {page.job ? <p className="mt-0.5 text-xs text-slate-500">{page.job}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <form action={setPageClientVisible.bind(null, page.id, !page.client_visible)}>
+          <button
+            aria-pressed={page.client_visible}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[13px] font-medium ${
+              page.client_visible
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-slate-200 text-slate-500 hover:bg-slate-100"
+            }`}
+            title={page.client_visible ? "Hide from the client plan" : "Show on the client plan"}
+            type="submit"
+          >
+            <span aria-hidden>{page.client_visible ? "☑" : "☐"}</span>
+            Client sees this
+          </button>
+        </form>
         {page.draft_run_id ? (
           <ButtonLink href={`/projects/${projectId}/runs/${page.draft_run_id}`} size="sm">
             Draft
@@ -95,6 +118,60 @@ function PageRow({
   );
 }
 
+function ClientPlanCard({
+  projectId,
+  link,
+  shown,
+  total,
+}: {
+  projectId: string;
+  link: string | null;
+  shown: number;
+  total: number;
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white px-5 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1 basis-80">
+          <h2 className="text-sm font-semibold text-slate-950">Client plan page</h2>
+          <p className="mt-0.5 text-sm text-slate-600">
+            {link
+              ? `A read-only page for the client. It lists the ${shown} of ${total} pages ticked "Client sees this" and nothing else, plus any checklist items ticked on the Checklist tab.`
+              : "A read-only page you can send the client. It lists only the pages you tick, and creating the link ticks months 1 and 2 to start."}
+          </p>
+          {link ? <p className="mt-2 font-mono text-xs break-all text-slate-700">{link}</p> : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {link ? (
+            <>
+              <CopyButton label="Copy link" text={link} />
+              <a
+                className={buttonClasses("secondary", "sm")}
+                href={link}
+                rel="noreferrer"
+                target="_blank"
+              >
+                See what they see
+              </a>
+              <form action={revokeClientLink.bind(null, projectId)}>
+                <button className={buttonClasses("ghost", "sm")} type="submit">
+                  Turn off link
+                </button>
+              </form>
+            </>
+          ) : (
+            <form action={createClientLink.bind(null, projectId)}>
+              <button className={buttonClasses("primary", "sm")} type="submit">
+                Create client link
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default async function PagesPage({
   params,
   searchParams,
@@ -108,6 +185,10 @@ export default async function PagesPage({
     latestApprovedRun(id, "p2"),
   ]);
   const month = currentBuildMonth(plan?.approved_at ?? null);
+  const clientLink = project.share_token
+    ? `${await clientPlanOrigin()}/plan/${project.share_token}`
+    : null;
+  const clientShown = pages.filter((p) => p.client_visible && p.status !== "skipped").length;
 
   const byMonth = new Map<number | null, Page[]>();
   for (const page of pages) {
@@ -134,6 +215,10 @@ export default async function PagesPage({
       />
       <ProjectNav counts={{ pages: pages.length }} projectId={id} />
 
+      {pages.length ? (
+        <ClientPlanCard link={clientLink} projectId={id} shown={clientShown} total={pages.length} />
+      ) : null}
+
       {pages.length === 0 ? (
         <EmptyState
           action={
@@ -158,6 +243,19 @@ export default async function PagesPage({
                     .length
                 }{" "}
                 of {byMonth.get(m)!.length} built
+              </span>
+              <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
+                {byMonth.get(m)!.filter((p) => p.client_visible).length} shown to client
+                <form action={setMonthClientVisible.bind(null, id, m, true)}>
+                  <button className={buttonClasses("ghost", "sm")} type="submit">
+                    Show all
+                  </button>
+                </form>
+                <form action={setMonthClientVisible.bind(null, id, m, false)}>
+                  <button className={buttonClasses("ghost", "sm")} type="submit">
+                    Hide all
+                  </button>
+                </form>
               </span>
             </header>
             <ul className="divide-y divide-slate-200">

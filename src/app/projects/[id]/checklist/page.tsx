@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { AppShell } from "@/components/app/app-shell";
 import { ProjectNav } from "@/components/app/project-nav";
@@ -20,6 +21,7 @@ export default async function ProjectChecklistPage({
   const [project, tasks] = await Promise.all([getProject(id), listTasks(id)]);
   const open = tasks.filter((t) => !t.done_at);
   const done = tasks.filter((t) => t.done_at);
+  const clientShown = tasks.filter((t) => t.client_visible).length;
 
   return (
     <AppShell
@@ -54,9 +56,16 @@ export default async function ProjectChecklistPage({
           <section className="rounded-lg border border-slate-200 bg-white">
             <header className="border-b border-slate-200 px-5 py-3">
               <h2 className="text-sm font-semibold text-slate-950">Open · {open.length}</h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {clientShown} of {tasks.length} items ticked &quot;Client sees this&quot; appear on
+                the client plan page&apos;s Checklist tab.{" "}
+                <Link className="underline" href={`/projects/${id}/pages`}>
+                  Client link
+                </Link>
+              </p>
             </header>
             {open.length ? (
-              <TaskList tasks={open} />
+              <TaskList clientToggle tasks={open} />
             ) : (
               <p className="px-5 py-4 text-sm text-slate-500">All done.</p>
             )}
@@ -67,7 +76,7 @@ export default async function ProjectChecklistPage({
                 Done · {done.length}
               </summary>
               <div className="border-t border-slate-200">
-                <TaskList tasks={done} />
+                <TaskList clientToggle tasks={done} />
               </div>
             </details>
           ) : null}

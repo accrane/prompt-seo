@@ -1,0 +1,257 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { type ClientPage, type ClientTask, getClientPlan } from "@/lib/client-plan";
+import type { PageAction, PageStatus } from "@/lib/db/types";
+import { formatDate } from "@/lib/format";
+
+// A private link: keep it out of search results and never cache one
+// client's plan for another request.
+export const metadata: Metadata = {
+  title: { absolute: "Website content plan" },
+  robots: { index: false, follow: false },
+};
+export const dynamic = "force-dynamic";
+
+const ACTION_LABEL: Record<PageAction, string> = {
+  new: "New page",
+  rewrite: "Rewrite of an existing page",
+  merge: "Combines existing pages",
+  redirect: "Redirect",
+};
+
+type Progress = { label: string; className: string };
+
+const PLANNED: Progress = { label: "Planned", className: "bg-slate-100 text-slate-700" };
+const IN_PROGRESS: Progress = { label: "In progress", className: "bg-amber-100 text-amber-900" };
+const LIVE: Progress = { label: "Live", className: "bg-emerald-100 text-emerald-900" };
+
+/** Internal drafting states collapse to the three a client cares about. */
+const PROGRESS: Record<PageStatus, Progress> = {
+  planned: PLANNED,
+  drafting: IN_PROGRESS,
+  drafted: IN_PROGRESS,
+  published: LIVE,
+  skipped: PLANNED,
+};
+
+/** "October 2026" for build month N, counting 30-day months from the plan's start. */
+function monthLabel(planStartedAt: string | null, month: number): string | null {
+  if (!planStartedAt) return null;
+  const start = new Date(planStartedAt);
+  start.setDate(start.getDate() + (month - 1) * 30);
+  return start.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+function PlanPage({ page }: { page: ClientPage }) {
+  const progress = PROGRESS[page.status];
+  return (
+    <li className="py-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 className="text-[17px] font-semibold break-all text-slate-950">{page.url}</h3>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[13px] font-medium ${progress.className}`}
+        >
+          {progress.label}
+        </span>
+      </div>
+      {page.canonical_query ? (
+        <p className="mt-1.5 text-[17px] leading-relaxed text-slate-700">
+          For people searching “{page.canonical_query}”
+        </p>
+      ) : null}
+      {page.job ? (
+        <p className="mt-1 text-[17px] leading-relaxed text-slate-700">{page.job}</p>
+      ) : null}
+      <p className="mt-1.5 text-sm text-slate-500">
+        {ACTION_LABEL[page.action]}
+        {page.page_type ? ` · ${page.page_type}` : null}
+      </p>
+    </li>
+  );
+}
+
+/** Read-only checklist row: the client sees progress but can't tick items. */
+function ChecklistItem({ task }: { task: ClientTask }) {
+  const done = Boolean(task.done_at);
+  return (
+    <li className="flex items-start gap-3 py-4">
+      <span
+        aria-hidden
+        className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+          done ? "border-emerald-700 bg-emerald-700 text-white" : "border-slate-400 bg-white"
+        }`}
+      >
+        {done ? (
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={3}
+            viewBox="0 0 24 24"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        ) : null}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-[17px] font-semibold text-slate-950">
+          <span className="sr-only">{done ? "Done: " : "To do: "}</span>
+          {task.title}
+        </h3>
+        {task.detail ? (
+          <p className="mt-1 text-[17px] leading-relaxed text-slate-700">{task.detail}</p>
+        ) : null}
+        <p className="mt-1.5 text-sm text-slate-500">
+          {done
+            ? `Done ${formatDate(task.done_at)}`
+            : task.due_on
+              ? `Due ${formatDate(task.due_on)}`
+              : "Not scheduled yet"}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function Checklist({ tasks }: { tasks: ClientTask[] }) {
+  const open = tasks.filter((t) => !t.done_at);
+  const done = tasks.filter((t) => t.done_at);
+  return (
+    <>
+      {[
+        { title: "To do", items: open },
+        { title: "Done", items: done },
+      ]
+        .filter((group) => group.items.length)
+        .map((group) => (
+          <section className="mt-12" key={group.title}>
+            <div className="flex items-baseline justify-between gap-4 border-b-2 border-slate-950 pb-2">
+              <h2 className="text-xl font-semibold text-slate-950">{group.title}</h2>
+              <span className="text-sm text-slate-500">
+                {group.items.length} item{group.items.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <ul className="divide-y divide-slate-200">
+              {group.items.map((task) => (
+                <ChecklistItem key={task.id} task={task} />
+              ))}
+            </ul>
+          </section>
+        ))}
+    </>
+  );
+}
+
+export default async function ClientPlanPage({ params, searchParams }: PageProps<"/plan/[token]">) {
+  const { token } = await params;
+  const plan = await getClientPlan(token);
+  if (!plan) notFound();
+
+  // The Checklist tab only exists when there is something on it.
+  const hasChecklist = plan.tasks.length > 0;
+  const tab = hasChecklist && (await searchParams).tab === "checklist" ? "checklist" : "pages";
+  const tasksDone = plan.tasks.filter((t) => t.done_at).length;
+
+  const byMonth = new Map<number | null, ClientPage[]>();
+  for (const page of plan.pages) {
+    byMonth.set(page.build_month, [...(byMonth.get(page.build_month) ?? []), page]);
+  }
+  const months = [...byMonth.keys()].sort((a, b) => (a ?? 99) - (b ?? 99));
+  const live = plan.pages.filter((p) => p.status === "published").length;
+  const site = plan.websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+  return (
+    <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-12 sm:py-16">
+      <header>
+        <p className="text-sm font-medium text-slate-500">{site}</p>
+        <h1 className="mt-2 text-3xl leading-tight font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          {plan.projectName}: website content plan
+        </h1>
+        {hasChecklist ? (
+          <nav aria-label="Plan sections" className="mt-8 flex gap-6 border-b border-slate-200">
+            {(
+              [
+                { key: "pages", label: "Pages", count: plan.pages.length, href: `/plan/${token}` },
+                {
+                  key: "checklist",
+                  label: "Checklist",
+                  count: plan.tasks.length,
+                  href: `/plan/${token}?tab=checklist`,
+                },
+              ] as const
+            ).map((item) => (
+              <Link
+                aria-current={tab === item.key ? "page" : undefined}
+                className={`-mb-px border-b-2 px-1 py-3 text-[17px] font-medium ${
+                  tab === item.key
+                    ? "border-slate-950 text-slate-950"
+                    : "border-transparent text-slate-500 hover:text-slate-950"
+                }`}
+                href={item.href}
+                key={item.key}
+              >
+                {item.label} <span className="text-sm text-slate-500">{item.count}</span>
+              </Link>
+            ))}
+          </nav>
+        ) : null}
+        {tab === "checklist" ? (
+          <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
+            The work behind the plan, beyond writing pages. {tasksDone} of {plan.tasks.length} done
+            so far.
+          </p>
+        ) : (
+          <>
+            <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
+              These are the pages we&apos;re building or rewriting for your site, in the order
+              we&apos;ll work on them. Each one is written to answer a specific search your
+              customers make.
+            </p>
+            {plan.pages.length ? (
+              <p className="mt-3 text-[17px] leading-relaxed text-slate-700">
+                {plan.pages.length} page{plan.pages.length === 1 ? "" : "s"} planned
+                {live ? `, ${live} live so far` : ""}.
+              </p>
+            ) : null}
+          </>
+        )}
+      </header>
+
+      {tab === "checklist" ? (
+        <Checklist tasks={plan.tasks} />
+      ) : plan.pages.length === 0 ? (
+        <p className="mt-10 rounded-lg border border-slate-200 bg-white px-5 py-6 text-[17px] text-slate-700">
+          The plan is being finalized. Check back soon.
+        </p>
+      ) : (
+        months.map((m) => {
+          const label = m ? monthLabel(plan.planStartedAt, m) : null;
+          return (
+            <section className="mt-12" key={m ?? "later"}>
+              <div className="flex items-baseline justify-between gap-4 border-b-2 border-slate-950 pb-2">
+                <h2 className="text-xl font-semibold text-slate-950">
+                  {m ? `Month ${m}` : "Later"}
+                </h2>
+                {label ? <span className="text-sm text-slate-500">{label}</span> : null}
+              </div>
+              <ul className="divide-y divide-slate-200">
+                {byMonth.get(m)!.map((page) => (
+                  <PlanPage key={page.id} page={page} />
+                ))}
+              </ul>
+            </section>
+          );
+        })
+      )}
+
+      <footer className="mt-16 border-t border-slate-200 pt-6 text-sm leading-relaxed text-slate-500">
+        <p>
+          Questions or changes? Reply to the email this link came in. Prepared by Bellaworks Web
+          Design.
+        </p>
+      </footer>
+    </main>
+  );
+}

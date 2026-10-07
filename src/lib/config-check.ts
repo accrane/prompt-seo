@@ -23,15 +23,6 @@ export function configProblems(): ConfigProblem[] {
     });
   }
 
-  // Dev-only stand-in mode (see src/lib/runs/stand-in.ts) needs no key.
-  const standIn = process.env.NODE_ENV !== "production" && process.env.CLAUDE_STAND_IN_DIR;
-  if (!env.ANTHROPIC_API_KEY && !standIn) {
-    problems.push({
-      name: "ANTHROPIC_API_KEY",
-      problem: "Missing. console.anthropic.com → API keys.",
-    });
-  }
-
   if (!env.CRON_SECRET) {
     problems.push({
       name: "CRON_SECRET",
@@ -40,4 +31,17 @@ export function configProblems(): ConfigProblem[] {
   }
 
   return problems;
+}
+
+/**
+ * Why this deployment can't run prompts, or null when it can. Kept out of
+ * `configProblems()` on purpose: a deployment without a Claude key (one that
+ * only serves the admin and client plan pages) still works for everything
+ * except starting or resuming a run.
+ */
+export function runBlocker(): string | null {
+  // Dev-only stand-in mode (see src/lib/runs/stand-in.ts) needs no key.
+  const standIn = process.env.NODE_ENV !== "production" && process.env.CLAUDE_STAND_IN_DIR;
+  if (env.ANTHROPIC_API_KEY || standIn) return null;
+  return "This deployment has no ANTHROPIC_API_KEY, so it can't run prompts. Add one (console.anthropic.com → API keys), or run prompts from a copy that has one.";
 }

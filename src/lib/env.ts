@@ -17,6 +17,8 @@ const envSchema = z.object({
   // Vercel Cron once reminders land).
   CRON_SECRET: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
+  // Where clients open their plan link, when that isn't this copy of the app.
+  CLIENT_PLAN_ORIGIN: z.string().optional(),
   // Encrypts stored Google refresh tokens; same value as WP Manager's.
   CREDENTIALS_KEY: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
@@ -52,6 +54,7 @@ export const env: Env = parseEnv({
   ANTHROPIC_API_KEY: opt(process.env.ANTHROPIC_API_KEY),
   CRON_SECRET: opt(process.env.CRON_SECRET),
   NEXT_PUBLIC_APP_URL: opt(process.env.NEXT_PUBLIC_APP_URL)?.replace(/\/$/, ""),
+  CLIENT_PLAN_ORIGIN: opt(process.env.CLIENT_PLAN_ORIGIN)?.replace(/\/$/, ""),
   CREDENTIALS_KEY: opt(process.env.CREDENTIALS_KEY),
   GOOGLE_CLIENT_ID: opt(process.env.GOOGLE_CLIENT_ID),
   GOOGLE_CLIENT_SECRET: opt(process.env.GOOGLE_CLIENT_SECRET),

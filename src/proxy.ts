@@ -6,7 +6,8 @@ import { env } from "@/lib/env";
 
 // /api/cron/* and /api/worker/* are called without a session (Vercel Cron, the
 // run worker handing off to itself); those routes check CRON_SECRET themselves.
-const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/api/worker"];
+// /plan/<token> is the client plan page; the token in the URL is the access check.
+const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/api/worker", "/plan"];
 
 /**
  * Refreshes the Supabase session on every request and bounces signed-out

@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { disconnectGoogle } from "@/lib/actions/google";
 import { requireOperator } from "@/lib/auth";
 import { DEFAULT_EFFORT, EXTRACT_MODEL, RUN_MODEL } from "@/lib/claude";
-import { configProblems } from "@/lib/config-check";
+import { configProblems, runBlocker } from "@/lib/config-check";
 import { hasCredentialsKey } from "@/lib/crypto";
 import { env } from "@/lib/env";
 import { formatDate } from "@/lib/format";
@@ -25,7 +25,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const connections = await listConnections();
   const callback = redirectUri(await appOrigin());
 
+  const blocker = runBlocker();
   const rows = [
+    ...(blocker ? [["Running prompts", `Off: ${blocker}`]] : []),
     ["Prompt model", `${RUN_MODEL} (default effort ${DEFAULT_EFFORT})`],
     ["Extraction model", `${EXTRACT_MODEL} (turns output into pages and checklist items)`],
     ["Web search", "On for every run, up to 8 searches per request"],
