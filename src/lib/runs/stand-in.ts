@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Extracted } from "@/lib/db/types";
@@ -28,6 +28,9 @@ const POLL_MS = 2000;
  * run to a fresh invocation, which starts waiting again.
  */
 const WAIT_PER_INVOCATION_MS = 10 * 60 * 1000;
+
+/** Give up on a section when no reply has arrived after this long in total. */
+const MAX_WAIT_MS = 60 * 60 * 1000;
 
 /** No reply yet and this invocation's time is nearly up. */
 export class StandInWaitExpired extends Error {}
@@ -57,15 +60,36 @@ export async function standInSection(
   await mkdir(runDir, { recursive: true });
   await writeFile(path.join(runDir, `${idx}.request.md`), request);
 
+  // The wait spans several invocations, so its start time lives on disk.
+  const waitFile = path.join(runDir, `${idx}.waiting`);
+  let waitingSince = Number(await readIfExists(waitFile));
+  if (!waitingSince) {
+    waitingSince = Date.now();
+    await writeFile(waitFile, String(waitingSince));
+  }
+
   const deadline = Date.now() + WAIT_PER_INVOCATION_MS;
   let reply: string | null = null;
   let beats = 0;
   while (!(reply = await readIfExists(path.join(runDir, `${idx}.md`)))) {
-    if (Date.now() > deadline)
+    if (Date.now() - waitingSince > MAX_WAIT_MS) {
+      await rm(waitFile, { force: true });
       throw new Error(`Stand-in: no reply for section ${idx + 1} within an hour.`);
+    }
+    // Hand the wait to a fresh invocation rather than failing the run.
+    if (Date.now() > deadline) throw new StandInWaitExpired();
     await new Promise((r) => setTimeout(r, POLL_MS));
-    if (++beats % 5 === 0) await heartbeat();
+    if (++beats % 5 === 0) {
+      try {
+        await heartbeat();
+      } catch (err) {
+        // Canceled: a later run of this section starts its hour afresh.
+        await rm(waitFile, { force: true });
+        throw err;
+      }
+    }
   }
+  await rm(waitFile, { force: true });
 
   // Stream it in over ~10 seconds, a line-aligned chunk at a time.
   const lines = reply.split("\n");

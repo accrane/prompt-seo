@@ -4,9 +4,9 @@
     {
       "name": "prompt-seo",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["exec", "next", "dev"],
+      "runtimeArgs": ["dev"],
       "port": 3001,
-      "autoPort": true
+      "autoPort": false
     }
   ]
 }
