@@ -288,12 +288,12 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
         {tabs.length > 1 ? (
           <nav
             aria-label="Plan sections"
-            className="mt-8 flex gap-6 overflow-x-auto border-b border-slate-200"
+            className="mt-8 flex gap-6 overflow-x-auto overflow-y-hidden border-b border-slate-200 [scrollbar-width:none]"
           >
             {tabs.map((item) => (
               <Link
                 aria-current={tab === item.key ? "page" : undefined}
-                className={`-mb-px border-b-2 px-1 py-3 text-[17px] font-medium whitespace-nowrap ${
+                className={`border-b-2 px-1 py-3 text-[17px] font-medium whitespace-nowrap ${
                   tab === item.key
                     ? "border-slate-950 text-slate-950"
                     : "border-transparent text-slate-500 hover:text-slate-950"
