@@ -183,6 +183,8 @@ function TechnicalIssues({ issues, origin }: { issues: ClientTask[]; origin: str
     <>
       {[...groups].map(([title, items]) => {
         const fixed = items.filter((i) => i.done_at).length;
+        // The first paragraph of the detail is the fix; any further ones are notes.
+        const [fix, ...notes] = (items[0].detail ?? "").split(/\n\s*\n/).filter(Boolean);
         return (
           <section className="mt-12" key={title}>
             <div className="flex items-baseline justify-between gap-4 border-b-2 border-slate-950 pb-2">
@@ -191,12 +193,20 @@ function TechnicalIssues({ issues, origin }: { issues: ClientTask[]; origin: str
                 {fixed} of {items.length} fixed
               </span>
             </div>
-            {items[0].detail ? (
+            {fix ? (
               <p className="mt-4 text-[17px] leading-relaxed text-slate-700">
                 <span className="font-semibold text-slate-950">How to fix: </span>
-                {items[0].detail}
+                {fix}
               </p>
             ) : null}
+            {notes.map((note) => (
+              <p
+                className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-600"
+                key={note}
+              >
+                {note}
+              </p>
+            ))}
             <ul className="mt-2 divide-y divide-slate-200">
               {items.map((item) => {
                 const done = Boolean(item.done_at);

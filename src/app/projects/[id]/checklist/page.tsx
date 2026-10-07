@@ -99,7 +99,7 @@ export default async function ProjectChecklistPage({
             </span>
             <span className="mt-0.5 block text-xs text-slate-500">
               {items.filter((t) => t.client_visible).length} shown on the client plan page&apos;s
-              Technical Issues tab. {items[0].detail}
+              Technical Issues tab. {(items[0].detail ?? "").split(/\n\s*\n/)[0]}
             </span>
           </summary>
           <div className="border-t border-slate-200">
