@@ -218,8 +218,7 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
               search your customers make.
             </p>
             <p className="mt-3 text-[17px] leading-relaxed text-slate-700">
-              It&apos;s a recommendation, not work underway. Building these pages is yours to carry
-              out, and the months are a suggested pace that starts whenever you do.
+              It&apos;s a recommendation. You can go at your own pace.
             </p>
             {plan.pages.length ? (
               <p className="mt-3 text-[17px] leading-relaxed text-slate-700">
