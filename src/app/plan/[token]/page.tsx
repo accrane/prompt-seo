@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { saveClientAnswer } from "@/lib/actions/client-answers";
 import { type ClientPage, type ClientTask, getClientPlan } from "@/lib/client-plan";
 import type { PageAction, PageStatus } from "@/lib/db/types";
 import { formatDate } from "@/lib/format";
@@ -80,10 +81,18 @@ function PlanPage({ page }: { page: ClientPage }) {
 }
 
 /** Read-only checklist row: the client sees progress but can't tick items. */
-function ChecklistItem({ task }: { task: ClientTask }) {
+function ChecklistItem({
+  task,
+  token,
+  justSaved,
+}: {
+  task: ClientTask;
+  token: string;
+  justSaved: boolean;
+}) {
   const done = Boolean(task.done_at);
   return (
-    <li className="flex items-start gap-3 py-4">
+    <li className="flex scroll-mt-6 items-start gap-3 py-4" id={`item-${task.id}`}>
       <span
         aria-hidden
         className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
@@ -117,12 +126,58 @@ function ChecklistItem({ task }: { task: ClientTask }) {
               ? `Suggested by ${formatDate(task.due_on)}`
               : "No date suggested"}
         </p>
+        {task.asks_answer && !done ? (
+          <form action={saveClientAnswer.bind(null, token, task.id)} className="mt-3">
+            <label
+              className="block text-sm font-medium text-slate-950"
+              htmlFor={`answer-${task.id}`}
+            >
+              Your answer
+            </label>
+            <textarea
+              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[17px] leading-relaxed text-slate-950"
+              defaultValue={task.client_answer ?? ""}
+              id={`answer-${task.id}`}
+              maxLength={4000}
+              name="answer"
+              rows={4}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <button
+                className="inline-flex h-11 items-center rounded-lg bg-slate-950 px-4 text-[15px] font-medium text-white hover:bg-slate-800"
+                type="submit"
+              >
+                Save answer
+              </button>
+              <p aria-live="polite" className="text-sm text-slate-500">
+                {justSaved
+                  ? "Saved. Thank you."
+                  : task.client_answered_at
+                    ? `Last saved ${formatDate(task.client_answered_at)}. You can change it any time.`
+                    : "Bellaworks will see your answer once you save."}
+              </p>
+            </div>
+          </form>
+        ) : task.client_answer ? (
+          <p className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-slate-700">
+            <span className="font-semibold text-slate-950">Your answer: </span>
+            {task.client_answer}
+          </p>
+        ) : null}
       </div>
     </li>
   );
 }
 
-function Checklist({ tasks }: { tasks: ClientTask[] }) {
+function Checklist({
+  tasks,
+  token,
+  saved,
+}: {
+  tasks: ClientTask[];
+  token: string;
+  saved: string | null;
+}) {
   const open = tasks.filter((t) => !t.done_at);
   const done = tasks.filter((t) => t.done_at);
   return (
@@ -142,7 +197,12 @@ function Checklist({ tasks }: { tasks: ClientTask[] }) {
             </div>
             <ul className="divide-y divide-slate-200">
               {group.items.map((task) => (
-                <ChecklistItem key={task.id} task={task} />
+                <ChecklistItem
+                  justSaved={saved === task.id}
+                  key={task.id}
+                  task={task}
+                  token={token}
+                />
               ))}
             </ul>
           </section>
@@ -274,7 +334,7 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
         ]
       : []),
   ];
-  const wanted = (await searchParams).tab;
+  const { tab: wanted, saved } = await searchParams;
   const tab = tabs.find((t) => t.key === wanted)?.key ?? "pages";
   const tasksDone = plan.tasks.filter((t) => t.done_at).length;
   const technicalFixed = plan.technical.filter((t) => t.done_at).length;
@@ -318,7 +378,11 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
         ) : null}
         {tab === "checklist" ? (
           <p className="mt-6 text-[17px] leading-relaxed text-slate-700">
-            The other steps we recommend alongside the pages. These are yours to complete.{" "}
+            {`The other steps we recommend alongside the pages. These are yours to complete${
+              plan.tasks.some((t) => t.asks_answer && !t.done_at)
+                ? ", and some need an answer from you"
+                : ""
+            }.`}{" "}
             {tasksDone} of {plan.tasks.length} done so far.
           </p>
         ) : tab === "technical" ? (
@@ -348,7 +412,11 @@ export default async function ClientPlanPage({ params, searchParams }: PageProps
       </header>
 
       {tab === "checklist" ? (
-        <Checklist tasks={plan.tasks} />
+        <Checklist
+          saved={typeof saved === "string" ? saved : null}
+          tasks={plan.tasks}
+          token={token}
+        />
       ) : tab === "technical" ? (
         <TechnicalIssues issues={plan.technical} origin={plan.websiteUrl.replace(/\/$/, "")} />
       ) : plan.pages.length === 0 ? (

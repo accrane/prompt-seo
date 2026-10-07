@@ -114,6 +114,10 @@ export type Task = {
   category: "checklist" | "technical";
   url: string | null;
   note: string | null;
+  /** Show an answer box for this item on the client plan page. */
+  asks_answer: boolean;
+  client_answer: string | null;
+  client_answered_at: string | null;
 };
 
 export type ExtractedTask = {

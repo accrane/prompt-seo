@@ -70,6 +70,16 @@ export async function setTaskClientVisible(taskId: string, visible: boolean): Pr
   revalidatePath("/", "layout");
 }
 
+/** Turns the answer box for one checklist item on the client page on or off. */
+export async function setTaskAsksAnswer(taskId: string, asks: boolean): Promise<void> {
+  await requireOperator();
+  must(
+    await db().from("pseo_tasks").update({ asks_answer: asks }).eq("id", taskId).select("id"),
+    "Update task",
+  );
+  revalidatePath("/", "layout");
+}
+
 /** Shows or hides every page in one build month (null = unscheduled). */
 export async function setMonthClientVisible(
   projectId: string,

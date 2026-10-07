@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { StatusBadge } from "@/components/ui/status-badge";
-import { setTaskClientVisible } from "@/lib/actions/client-plan";
+import { setTaskAsksAnswer, setTaskClientVisible } from "@/lib/actions/client-plan";
 import { deleteTask, toggleTask } from "@/lib/actions/tasks";
 import type { Task } from "@/lib/db/types";
 import { formatDate } from "@/lib/format";
@@ -73,6 +73,15 @@ export function TaskList({
               ) : task.detail && !done ? (
                 <p className="mt-0.5 text-sm text-slate-500">{task.detail}</p>
               ) : null}
+              {task.client_answer ? (
+                <p className="mt-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm whitespace-pre-wrap text-slate-900">
+                  <span className="font-medium text-emerald-700">
+                    Client answered
+                    {task.client_answered_at ? ` ${formatDate(task.client_answered_at)}` : ""}:{" "}
+                  </span>
+                  {task.client_answer}
+                </p>
+              ) : null}
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 {showProject && task.project_name ? (
                   <Link
@@ -102,6 +111,27 @@ export function TaskList({
                 ) : null}
               </p>
             </div>
+            {clientToggle && !technical && task.client_visible ? (
+              <form action={setTaskAsksAnswer.bind(null, task.id, !task.asks_answer)}>
+                <button
+                  aria-pressed={Boolean(task.asks_answer)}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[13px] font-medium whitespace-nowrap ${
+                    task.asks_answer
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 text-slate-500 hover:bg-slate-100"
+                  }`}
+                  title={
+                    task.asks_answer
+                      ? "Remove the answer box on the client plan"
+                      : "Give the client a text box to answer this item"
+                  }
+                  type="submit"
+                >
+                  <span aria-hidden>{task.asks_answer ? "☑" : "☐"}</span>
+                  Client can answer
+                </button>
+              </form>
+            ) : null}
             {clientToggle ? (
               <form action={setTaskClientVisible.bind(null, task.id, !task.client_visible)}>
                 <button

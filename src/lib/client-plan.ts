@@ -14,7 +14,8 @@ export type ClientPage = Pick<
 
 /**
  * The checklist fields a client may see. Rows are read whole so the page still
- * loads on a database without migration 005's columns, then cut down to these.
+ * loads on a database without the later migrations' columns, then cut down to
+ * these.
  */
 function toClientTask(row: Task): ClientTask {
   return {
@@ -26,12 +27,25 @@ function toClientTask(row: Task): ClientTask {
     category: row.category ?? "checklist",
     url: row.url ?? null,
     note: row.note ?? null,
+    asks_answer: row.asks_answer ?? false,
+    client_answer: row.client_answer ?? null,
+    client_answered_at: row.client_answered_at ?? null,
   };
 }
 
 export type ClientTask = Pick<
   Task,
-  "id" | "title" | "detail" | "due_on" | "done_at" | "category" | "url" | "note"
+  | "id"
+  | "title"
+  | "detail"
+  | "due_on"
+  | "done_at"
+  | "category"
+  | "url"
+  | "note"
+  | "asks_answer"
+  | "client_answer"
+  | "client_answered_at"
 >;
 
 export type ClientPlan = {
@@ -46,6 +60,18 @@ export type ClientPlan = {
 };
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{20,64}$/;
+
+/** The project a share token opens, or null. Used to check public writes. */
+export async function projectIdForToken(token: string): Promise<string | null> {
+  if (!TOKEN_PATTERN.test(token)) return null;
+  const { data, error } = await db()
+    .from("pseo_projects")
+    .select("id")
+    .eq("share_token", token)
+    .maybeSingle();
+  if (error) throw new Error(`Check plan link: ${error.message}`);
+  return data?.id ?? null;
+}
 
 /**
  * The client plan behind a share token, or null when the token is unknown or
